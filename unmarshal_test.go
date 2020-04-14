@@ -13,10 +13,8 @@ import (
 	"github.com/tada/catch/pio"
 )
 
-func decoderOn(s string) *json.Decoder {
-	js := json.NewDecoder(bytes.NewReader([]byte(s)))
-	js.UseNumber()
-	return js
+func decoderOn(s string) Decoder {
+	return NewDecoder(bytes.NewReader([]byte(s)))
 }
 
 type ts struct {
@@ -39,15 +37,15 @@ func (t *ts) MarshalToJSON(w io.Writer) {
 	pio.WriteByte('}', w)
 }
 
-func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
+func (t *ts) UnmarshalFromJSON(js Decoder, firstToken json.Token) {
 	AssertDelim(firstToken, '{')
 	for {
-		s, ok := ReadStringOrEnd(js, '}')
+		s, ok := js.ReadStringOrEnd('}')
 		if !ok {
 			break
 		}
 		if s == "v" {
-			t.v = time.Duration(ReadInt(js)) * time.Millisecond
+			t.v = time.Duration(js.ReadInt()) * time.Millisecond
 		}
 	}
 }
@@ -65,19 +63,19 @@ func ExampleUnmarshal() {
 func TestReadDelim(t *testing.T) {
 	js := decoderOn("{}")
 	err := catch.Do(func() {
-		ReadDelim(js, '{')
+		js.ReadDelim('{')
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		ReadDelim(js, '{')
+		js.ReadDelim('{')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	err = catch.Do(func() {
-		ReadDelim(js, '{')
+		js.ReadDelim('{')
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -87,7 +85,7 @@ func TestReadDelim(t *testing.T) {
 func TestReadString(t *testing.T) {
 	js := decoderOn(`"a"`)
 	err := catch.Do(func() {
-		if s := ReadString(js); s != "a" {
+		if s := js.ReadString(); s != "a" {
 			panic(catch.Error(`expected "a", got "%s"`, s))
 		}
 	})
@@ -96,21 +94,33 @@ func TestReadString(t *testing.T) {
 	}
 	js = decoderOn(`1`)
 	err = catch.Do(func() {
-		ReadString(js)
+		js.ReadString()
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
+	js = decoderOn(`null`)
+	err = catch.Do(func() {
+		if s := js.ReadString(); s != "" {
+			panic(catch.Error(`expected empty string, got %q`, s))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestReadStringOrEnd(t *testing.T) {
-	js := decoderOn(`["a"]`)
+	js := decoderOn(`["a", null]`)
 	err := catch.Do(func() {
-		ReadDelim(js, '[')
-		if _, ok := ReadStringOrEnd(js, ']'); !ok {
+		js.ReadDelim('[')
+		if s, ok := js.ReadStringOrEnd(']'); !(ok && s == "a") {
 			panic(catch.Error(`expected "a", got end`))
 		}
-		if s, ok := ReadStringOrEnd(js, ']'); ok {
+		if s, ok := js.ReadStringOrEnd(']'); !(ok && s == "") {
+			panic(catch.Error(`expected null, got end`))
+		}
+		if s, ok := js.ReadStringOrEnd(']'); ok {
 			panic(catch.Error(`expected end, got "%s"`, s))
 		}
 	})
@@ -118,14 +128,77 @@ func TestReadStringOrEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		_, _ = ReadStringOrEnd(js, ']')
+		_, _ = js.ReadStringOrEnd(']')
+	})
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal("expected ErrUnexpectedEOF")
+	}
+	js = decoderOn(`23`)
+	err = catch.Do(func() {
+		_, _ = js.ReadStringOrEnd(']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	js = decoderOn(`23`)
+}
+
+func TestReadBool(t *testing.T) {
+	js := decoderOn(`true`)
+	err := catch.Do(func() {
+		if s := js.ReadBool(); !s {
+			panic(catch.Error(`expected true, got false`))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	js = decoderOn(`"a"`)
 	err = catch.Do(func() {
-		_, _ = ReadStringOrEnd(js, ']')
+		js.ReadBool()
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	js = decoderOn(`null`)
+	err = catch.Do(func() {
+		if s := js.ReadBool(); s {
+			panic(catch.Error(`expected false, got true`))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadBoolOrEnd(t *testing.T) {
+	js := decoderOn(`[true, false, null]`)
+	err := catch.Do(func() {
+		js.ReadDelim('[')
+		if b, ok := js.ReadBoolOrEnd(']'); !(ok && b) {
+			panic(catch.Error(`expected true, got end`))
+		}
+		if b, ok := js.ReadBoolOrEnd(']'); !(ok && !b) {
+			panic(catch.Error(`expected false, got end`))
+		}
+		if b, ok := js.ReadBoolOrEnd(']'); !(ok && !b) {
+			panic(catch.Error(`expected false, got end`))
+		}
+		if b, ok := js.ReadBoolOrEnd(']'); ok {
+			panic(catch.Error(`expected end, got "%b"`, b))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = catch.Do(func() {
+		_, _ = js.ReadBoolOrEnd(']')
+	})
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal("expected ErrUnexpectedEOF")
+	}
+	js = decoderOn(`"a"`)
+	err = catch.Do(func() {
+		_, _ = js.ReadBoolOrEnd(']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -135,7 +208,7 @@ func TestReadStringOrEnd(t *testing.T) {
 func TestReadInt(t *testing.T) {
 	js := decoderOn(`1`)
 	err := catch.Do(func() {
-		if s := ReadInt(js); s != 1 {
+		if s := js.ReadInt(); s != 1 {
 			panic(catch.Error(`expected 1, got %d`, s))
 		}
 	})
@@ -144,21 +217,33 @@ func TestReadInt(t *testing.T) {
 	}
 	js = decoderOn(`"a"`)
 	err = catch.Do(func() {
-		ReadInt(js)
+		js.ReadInt()
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
+	js = decoderOn(`null`)
+	err = catch.Do(func() {
+		if s := js.ReadInt(); s != 0 {
+			panic(catch.Error(`expected 0, got %d`, s))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestReadIntOrEnd(t *testing.T) {
-	js := decoderOn(`[42]`)
+	js := decoderOn(`[42, null]`)
 	err := catch.Do(func() {
-		ReadDelim(js, '[')
-		if _, ok := ReadIntOrEnd(js, ']'); !ok {
-			panic(catch.Error(`expected "a", got end`))
+		js.ReadDelim('[')
+		if i, ok := js.ReadIntOrEnd(']'); !(ok && i == 42) {
+			panic(catch.Error(`expected 42, got end`))
 		}
-		if i, ok := ReadIntOrEnd(js, ']'); ok {
+		if i, ok := js.ReadIntOrEnd(']'); !(ok && i == 0) {
+			panic(catch.Error(`expected 0, got end`))
+		}
+		if i, ok := js.ReadIntOrEnd(']'); ok {
 			panic(catch.Error(`expected end, got "%d"`, i))
 		}
 	})
@@ -166,14 +251,74 @@ func TestReadIntOrEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		_, _ = ReadIntOrEnd(js, ']')
+		_, _ = js.ReadIntOrEnd(']')
+	})
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal("expected ErrUnexpectedEOF")
+	}
+	js = decoderOn(`"a"`)
+	err = catch.Do(func() {
+		_, _ = js.ReadIntOrEnd(']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
+}
+
+func TestReadfloat(t *testing.T) {
+	js := decoderOn(`1.3`)
+	err := catch.Do(func() {
+		if s := js.ReadFloat(); s != 1.3 {
+			panic(catch.Error(`expected 1.3, got %f`, s))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	js = decoderOn(`"a"`)
 	err = catch.Do(func() {
-		_, _ = ReadIntOrEnd(js, ']')
+		js.ReadFloat()
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	js = decoderOn(`null`)
+	err = catch.Do(func() {
+		if s := js.ReadFloat(); s != 0 {
+			panic(catch.Error(`expected 0, got %f`, s))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadFloatOrEnd(t *testing.T) {
+	js := decoderOn(`[42.31, null]`)
+	err := catch.Do(func() {
+		js.ReadDelim('[')
+		if f, ok := js.ReadFloatOrEnd(']'); !(ok && f == 42.31) {
+			panic(catch.Error(`expected 42, got end`))
+		}
+		if f, ok := js.ReadFloatOrEnd(']'); !(ok && f == 0) {
+			panic(catch.Error(`expected 0, got end`))
+		}
+		if f, ok := js.ReadFloatOrEnd(']'); ok {
+			panic(catch.Error(`expected end, got "%f"`, f))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = catch.Do(func() {
+		_, _ = js.ReadFloatOrEnd(']')
+	})
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal("expected ErrUnexpectedEOF")
+	}
+	js = decoderOn(`"a"`)
+	err = catch.Do(func() {
+		_, _ = js.ReadFloatOrEnd(']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -186,17 +331,17 @@ type testConsumer struct {
 	i int64
 }
 
-func (t *testConsumer) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
+func (t *testConsumer) UnmarshalFromJSON(js Decoder, firstToken json.Token) {
 	AssertDelim(firstToken, '{')
 	var s string
 	ok := true
 	for ok {
-		if s, ok = ReadStringOrEnd(js, '}'); ok {
+		if s, ok = js.ReadStringOrEnd('}'); ok {
 			switch s {
 			case "m":
-				t.m = ReadString(js)
+				t.m = js.ReadString()
 			case "i":
-				t.i = ReadInt(js)
+				t.i = js.ReadInt()
 			default:
 				t.t.Fatalf("unexpected string %q", s)
 			}
@@ -205,36 +350,55 @@ func (t *testConsumer) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token
 }
 
 func TestReadConsumer(t *testing.T) {
-	js := decoderOn(`{"m":"message","i":42}`)
+	js := decoderOn(`[{"m":"message","i":42}, null]`)
 	err := catch.Do(func() {
+		js.ReadDelim('[')
 		tc := &testConsumer{t: t}
-		ReadConsumer(js, tc)
-		if !(tc.m == "message" && tc.i == 42) {
+		valid := js.ReadConsumer(tc)
+		if !(valid && tc.m == "message" && tc.i == 42) {
 			t.Fatal("unexpected consumer values")
 		}
+		valid = js.ReadConsumer(tc)
+		if valid {
+			t.Fatal("expected null, got valid consumer")
+		}
+		js.ReadDelim(']')
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
 		tc := &testConsumer{t: t}
-		ReadConsumer(js, tc)
+		js.ReadConsumer(tc)
 	})
-	if err == nil {
-		t.Fatal("expected error")
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal("expected ErrUnexpectedEOF")
 	}
 }
 
 func TestReadConsumerOrEnd(t *testing.T) {
-	js := decoderOn(`[{"m":"message","i":42}]`)
+	js := decoderOn(`[{"m":"message","i":42}, null]`)
 	err := catch.Do(func() {
-		ReadDelim(js, '[')
+		js.ReadDelim('[')
 		tc := &testConsumer{t: t}
-		if ok := ReadConsumerOrEnd(js, tc, ']'); !ok {
+		valid, ok := js.ReadConsumerOrEnd(tc, ']')
+		if !(ok && valid) {
 			panic(catch.Error(`expected consumer, got end`))
 		}
-		if ok := ReadConsumerOrEnd(js, tc, ']'); ok {
-			panic(catch.Error(`expected end, got consumer %v`, tc))
+		valid, ok = js.ReadConsumerOrEnd(tc, ']')
+		if ok {
+			if valid {
+				panic(catch.Error(`expected null, got valid consumer`))
+			}
+		} else {
+			panic(catch.Error(`expected null, got end`))
+		}
+		valid, ok = js.ReadConsumerOrEnd(tc, ']')
+		if ok {
+			if valid {
+				panic(catch.Error(`expected end, got valid consumer`))
+			}
+			panic(catch.Error(`expected end, got null`))
 		}
 	})
 	if err != nil {
@@ -242,7 +406,7 @@ func TestReadConsumerOrEnd(t *testing.T) {
 	}
 	err = catch.Do(func() {
 		tc := &testConsumer{t: t}
-		_ = ReadConsumerOrEnd(js, tc, ']')
+		_, _ = js.ReadConsumerOrEnd(tc, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
