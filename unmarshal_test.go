@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"testing"
 	"time"
 
 	"github.com/tada/catch"
+	"github.com/tada/catch/pio"
 )
 
 func decoderOn(s string) *json.Decoder {
@@ -21,17 +23,33 @@ type ts struct {
 	v time.Duration
 }
 
-func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
-	AssertDelimToken(firstToken, '{')
-	s := AssertString(js)
-	if s == "v" {
-		t.v = time.Duration(AssertInt(js)) * time.Millisecond
-	}
-	AssertDelim(js, '}')
+func (t *ts) MarshalJSON() ([]byte, error) {
+	return Marshal(t)
 }
 
 func (t *ts) UnmarshalJSON(bs []byte) error {
 	return Unmarshal(t, bs)
+}
+
+func (t *ts) MarshalToJSON(w io.Writer) {
+	pio.WriteByte('{', w)
+	WriteString("v", w)
+	pio.WriteByte(':', w)
+	pio.WriteInt(int64(t.v/time.Millisecond), w)
+	pio.WriteByte('}', w)
+}
+
+func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
+	AssertDelimToken(firstToken, '{')
+	for {
+		s, ok := AssertStringOrEnd(js, '}')
+		if !ok {
+			break
+		}
+		if s == "v" {
+			t.v = time.Duration(AssertInt(js)) * time.Millisecond
+		}
+	}
 }
 
 func ExampleUnmarshal() {
@@ -95,7 +113,6 @@ func TestAssertStringOrEnd(t *testing.T) {
 		if s, ok := AssertStringOrEnd(js, ']'); ok {
 			panic(catch.Error(`expected end, got "%s"`, s))
 		}
-		return
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -219,7 +236,6 @@ func TestAssertConsumerOrEnd(t *testing.T) {
 		if ok := AssertConsumerOrEnd(js, tc, ']'); ok {
 			panic(catch.Error(`expected end, got consumer %v`, tc))
 		}
-		return
 	})
 	if err != nil {
 		t.Fatal(err)

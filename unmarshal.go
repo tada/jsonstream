@@ -9,6 +9,7 @@ import (
 	"github.com/tada/catch"
 )
 
+// A Consumer can initialize itself using a json.Decoder
 type Consumer interface {
 	// Initialize this instance from a json.Decoder
 	UnmarshalFromJSON(js *json.Decoder, firstToken json.Token)
