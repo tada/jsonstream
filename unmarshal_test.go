@@ -40,14 +40,14 @@ func (t *ts) MarshalToJSON(w io.Writer) {
 }
 
 func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
-	AssertDelimToken(firstToken, '{')
+	AssertDelim(firstToken, '{')
 	for {
-		s, ok := AssertStringOrEnd(js, '}')
+		s, ok := ReadStringOrEnd(js, '}')
 		if !ok {
 			break
 		}
 		if s == "v" {
-			t.v = time.Duration(AssertInt(js)) * time.Millisecond
+			t.v = time.Duration(ReadInt(js)) * time.Millisecond
 		}
 	}
 }
@@ -62,32 +62,32 @@ func ExampleUnmarshal() {
 	// Output: &{38000000}
 }
 
-func TestAssertDelim(t *testing.T) {
+func TestReadDelim(t *testing.T) {
 	js := decoderOn("{}")
 	err := catch.Do(func() {
-		AssertDelim(js, '{')
+		ReadDelim(js, '{')
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		AssertDelim(js, '{')
+		ReadDelim(js, '{')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	err = catch.Do(func() {
-		AssertDelim(js, '{')
+		ReadDelim(js, '{')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAssertString(t *testing.T) {
+func TestReadString(t *testing.T) {
 	js := decoderOn(`"a"`)
 	err := catch.Do(func() {
-		if s := AssertString(js); s != "a" {
+		if s := ReadString(js); s != "a" {
 			panic(catch.Error(`expected "a", got "%s"`, s))
 		}
 	})
@@ -96,21 +96,21 @@ func TestAssertString(t *testing.T) {
 	}
 	js = decoderOn(`1`)
 	err = catch.Do(func() {
-		AssertString(js)
+		ReadString(js)
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAssertStringOrEnd(t *testing.T) {
+func TestReadStringOrEnd(t *testing.T) {
 	js := decoderOn(`["a"]`)
 	err := catch.Do(func() {
-		AssertDelim(js, '[')
-		if _, ok := AssertStringOrEnd(js, ']'); !ok {
+		ReadDelim(js, '[')
+		if _, ok := ReadStringOrEnd(js, ']'); !ok {
 			panic(catch.Error(`expected "a", got end`))
 		}
-		if s, ok := AssertStringOrEnd(js, ']'); ok {
+		if s, ok := ReadStringOrEnd(js, ']'); ok {
 			panic(catch.Error(`expected end, got "%s"`, s))
 		}
 	})
@@ -118,24 +118,24 @@ func TestAssertStringOrEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		_, _ = AssertStringOrEnd(js, ']')
+		_, _ = ReadStringOrEnd(js, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	js = decoderOn(`23`)
 	err = catch.Do(func() {
-		_, _ = AssertStringOrEnd(js, ']')
+		_, _ = ReadStringOrEnd(js, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAssertInt(t *testing.T) {
+func TestReadInt(t *testing.T) {
 	js := decoderOn(`1`)
 	err := catch.Do(func() {
-		if s := AssertInt(js); s != 1 {
+		if s := ReadInt(js); s != 1 {
 			panic(catch.Error(`expected 1, got %d`, s))
 		}
 	})
@@ -144,21 +144,21 @@ func TestAssertInt(t *testing.T) {
 	}
 	js = decoderOn(`"a"`)
 	err = catch.Do(func() {
-		AssertInt(js)
+		ReadInt(js)
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAssertIntOrEnd(t *testing.T) {
+func TestReadIntOrEnd(t *testing.T) {
 	js := decoderOn(`[42]`)
 	err := catch.Do(func() {
-		AssertDelim(js, '[')
-		if _, ok := AssertIntOrEnd(js, ']'); !ok {
+		ReadDelim(js, '[')
+		if _, ok := ReadIntOrEnd(js, ']'); !ok {
 			panic(catch.Error(`expected "a", got end`))
 		}
-		if i, ok := AssertIntOrEnd(js, ']'); ok {
+		if i, ok := ReadIntOrEnd(js, ']'); ok {
 			panic(catch.Error(`expected end, got "%d"`, i))
 		}
 	})
@@ -166,14 +166,14 @@ func TestAssertIntOrEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = catch.Do(func() {
-		_, _ = AssertIntOrEnd(js, ']')
+		_, _ = ReadIntOrEnd(js, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	js = decoderOn(`"a"`)
 	err = catch.Do(func() {
-		_, _ = AssertIntOrEnd(js, ']')
+		_, _ = ReadIntOrEnd(js, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -187,16 +187,16 @@ type testConsumer struct {
 }
 
 func (t *testConsumer) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
-	AssertDelimToken(firstToken, '{')
+	AssertDelim(firstToken, '{')
 	var s string
 	ok := true
 	for ok {
-		if s, ok = AssertStringOrEnd(js, '}'); ok {
+		if s, ok = ReadStringOrEnd(js, '}'); ok {
 			switch s {
 			case "m":
-				t.m = AssertString(js)
+				t.m = ReadString(js)
 			case "i":
-				t.i = AssertInt(js)
+				t.i = ReadInt(js)
 			default:
 				t.t.Fatalf("unexpected string %q", s)
 			}
@@ -204,11 +204,11 @@ func (t *testConsumer) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token
 	}
 }
 
-func TestAssertConsumer(t *testing.T) {
+func TestReadConsumer(t *testing.T) {
 	js := decoderOn(`{"m":"message","i":42}`)
 	err := catch.Do(func() {
 		tc := &testConsumer{t: t}
-		AssertConsumer(js, tc)
+		ReadConsumer(js, tc)
 		if !(tc.m == "message" && tc.i == 42) {
 			t.Fatal("unexpected consumer values")
 		}
@@ -218,22 +218,22 @@ func TestAssertConsumer(t *testing.T) {
 	}
 	err = catch.Do(func() {
 		tc := &testConsumer{t: t}
-		AssertConsumer(js, tc)
+		ReadConsumer(js, tc)
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAssertConsumerOrEnd(t *testing.T) {
+func TestReadConsumerOrEnd(t *testing.T) {
 	js := decoderOn(`[{"m":"message","i":42}]`)
 	err := catch.Do(func() {
-		AssertDelim(js, '[')
+		ReadDelim(js, '[')
 		tc := &testConsumer{t: t}
-		if ok := AssertConsumerOrEnd(js, tc, ']'); !ok {
+		if ok := ReadConsumerOrEnd(js, tc, ']'); !ok {
 			panic(catch.Error(`expected consumer, got end`))
 		}
-		if ok := AssertConsumerOrEnd(js, tc, ']'); ok {
+		if ok := ReadConsumerOrEnd(js, tc, ']'); ok {
 			panic(catch.Error(`expected end, got consumer %v`, tc))
 		}
 	})
@@ -242,7 +242,7 @@ func TestAssertConsumerOrEnd(t *testing.T) {
 	}
 	err = catch.Do(func() {
 		tc := &testConsumer{t: t}
-		_ = AssertConsumerOrEnd(js, tc, ']')
+		_ = ReadConsumerOrEnd(js, tc, ']')
 	})
 	if err == nil {
 		t.Fatal("expected error")

@@ -54,10 +54,10 @@ func (t *ts) MarshalToJSON(w io.Writer) {
 
 // UnmarshalToJSON decodes using the given decoder
 func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
-  jsonstream.AssertDelimToken(firstToken, '{')
+  jsonstream.AssertDelim(firstToken, '{')
   for {
     // Read next key or end of object
-    s, ok := jsonstream.AssertStringOrEnd(js, '}')
+    s, ok := jsonstream.ReadStringOrEnd(js, '}')
     if !ok {
       // No more object entries
       break
@@ -65,7 +65,7 @@ func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
 
     // Decode and assign to given key
     if s == "v" {
-      t.v = time.Duration(jsonstream.AssertInt(js)) * time.Millisecond
+      t.v = time.Duration(jsonstream.ReadInt(js)) * time.Millisecond
     }
   }
 }
