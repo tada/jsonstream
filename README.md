@@ -12,6 +12,9 @@ go get github.com/tada/jsonstream
 ```
 ### Sample usage
 
+Since jsonstream uses the github.com/tada/catch module, all error handling is baked into the support functions. If any
+error is encountered, it will result in a panic that is recovered in the top level functions `Marshal` and `Unmarshal`.
+Code using the support functions, like in the example below, is compact since no error propagation is needed.
 ```go
 package tst
 
@@ -53,10 +56,14 @@ func (t *ts) MarshalToJSON(w io.Writer) {
 func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
   jsonstream.AssertDelimToken(firstToken, '{')
   for {
+    // Read next key or end of object
     s, ok := jsonstream.AssertStringOrEnd(js, '}')
     if !ok {
+      // No more object entries
       break
     }
+
+    // Decode and assign to given key
     if s == "v" {
       t.v = time.Duration(jsonstream.AssertInt(js)) * time.Millisecond
     }
