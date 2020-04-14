@@ -16,50 +16,50 @@ go get github.com/tada/jsonstream
 package tst
 
 import (
-	"encoding/json"
-	"io"
-	"time"
+  "encoding/json"
+  "io"
+  "time"
 
-	"github.com/tada/catch/pio"
-	"github.com/tada/jsonstream"
+  "github.com/tada/catch/pio"
+  "github.com/tada/jsonstream"
 )
 
 type ts struct {
-	v time.Duration
+  v time.Duration
 }
 
 // MarshalJSON is from the json.Marshaller interface
 func (t *ts) MarshalJSON() ([]byte, error) {
-    // Dispatch to the helper function
-	return jsonstream.Marshal(t)
+  // Dispatch to the helper function
+  return jsonstream.Marshal(t)
 }
 
 // UnmarshalJSON is from the json.Marshaller interface
 func (t *ts) UnmarshalJSON(bs []byte) error {
-    // Dispatch to the helper function
-	return jsonstream.Unmarshal(t, bs)
+  // Dispatch to the helper function
+  return jsonstream.Unmarshal(t, bs)
 }
 
 // MarshalToJSON encode as json and stream result to the writer
 func (t *ts) MarshalToJSON(w io.Writer) {
-	pio.WriteByte('{', w)
-	jsonstream.WriteString("v", w)
-	pio.WriteByte(':', w)
-	pio.WriteInt(int64(t.v/time.Millisecond), w)
-	pio.WriteByte('}', w)
+  pio.WriteByte('{', w)
+  jsonstream.WriteString("v", w)
+  pio.WriteByte(':', w)
+  pio.WriteInt(int64(t.v/time.Millisecond), w)
+  pio.WriteByte('}', w)
 }
 
 // UnmarshalToJSON decodes using the given decoder
 func (t *ts) UnmarshalFromJSON(js *json.Decoder, firstToken json.Token) {
-	jsonstream.AssertDelimToken(firstToken, '{')
-	for {
-		s, ok := jsonstream.AssertStringOrEnd(js, '}')
-		if !ok {
-			break
-		}
-		if s == "v" {
-			t.v = time.Duration(jsonstream.AssertInt(js)) * time.Millisecond
-		}
-	}
+  jsonstream.AssertDelimToken(firstToken, '{')
+  for {
+    s, ok := jsonstream.AssertStringOrEnd(js, '}')
+    if !ok {
+      break
+    }
+    if s == "v" {
+      t.v = time.Duration(jsonstream.AssertInt(js)) * time.Millisecond
+    }
+  }
 }
 ```
