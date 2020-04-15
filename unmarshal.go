@@ -11,6 +11,9 @@ import (
 
 // A Decoder provides methods to interpret JSON from a stream of tokens provided by a json.Decoder.
 type Decoder interface {
+	// JSONDecoder returns the underlying json.Decoder instance
+	JSONDecoder() *json.Decoder
+
 	// ReadBool reads next token from the decoder and asserts that it is an boolean or null. The function returns the
 	// boolean (or false in case of null) or raises a panic with a catch.Error if an error occurred or if the token
 	// didn't match a boolean or null.
@@ -112,6 +115,11 @@ func Unmarshal(c Consumer, bs []byte) error {
 		js := NewDecoder(bytes.NewReader(bs))
 		js.ReadConsumer(c)
 	})
+}
+
+// JSONDecoder returns the underlying json.Decoder instance
+func (d *decoder) JSONDecoder() *json.Decoder {
+	return d.Decoder
 }
 
 // ReadBool reads next token from the decoder and asserts that it is an boolean or null. The function returns the

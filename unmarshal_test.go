@@ -60,6 +60,14 @@ func ExampleUnmarshal() {
 	// Output: &{38000000}
 }
 
+func TestJSONDecoder(t *testing.T) {
+	jd := json.NewDecoder(bytes.NewReader([]byte("{}")))
+	js := &decoder{jd}
+	if js.JSONDecoder() != jd {
+		t.Fatal("JSONDecoder() returned different instance")
+	}
+}
+
 func TestReadDelim(t *testing.T) {
 	js := decoderOn("{}")
 	err := catch.Do(func() {
