@@ -30,11 +30,11 @@ func (t *ts) UnmarshalJSON(bs []byte) error {
 }
 
 func (t *ts) MarshalToJSON(w io.Writer) {
-	pio.WriteByte('{', w)
-	WriteString("v", w)
-	pio.WriteByte(':', w)
-	pio.WriteInt(int64(t.v/time.Millisecond), w)
-	pio.WriteByte('}', w)
+	pio.WriteByte(w, '{')
+	WriteString(w, "v")
+	pio.WriteByte(w, ':')
+	pio.WriteInt(w, int64(t.v/time.Millisecond))
+	pio.WriteByte(w, '}')
 }
 
 func (t *ts) UnmarshalFromJSON(js Decoder, firstToken json.Token) {

@@ -20,7 +20,7 @@ func TestMarshal(t *testing.T) {
 
 func TestWriteString(t *testing.T) {
 	b := bytes.Buffer{}
-	WriteString(`The "quoted" part`, &b)
+	WriteString(&b, `The "quoted" part`)
 	a := b.String()
 	e := `"The \"quoted\" part"`
 	if a != e {

@@ -38,21 +38,21 @@ func Marshal(s Streamer) (result []byte, err error) {
 // the '"' and the '\'.
 //
 // If an error occurs the method panics with a Error with the Cause set to that error
-func WriteString(s string, w io.Writer) {
-	pio.WriteByte('"', w)
+func WriteString(w io.Writer, s string) {
+	pio.WriteByte(w, '"')
 	r := strings.NewReader(s)
 	for {
 		r, _, err := r.ReadRune()
 		if err == io.EOF {
-			pio.WriteByte('"', w)
+			pio.WriteByte(w, '"')
 			return
 		}
 		switch r {
 		case '"', '\\':
-			pio.WriteByte('\\', w)
-			pio.WriteByte(byte(r), w)
+			pio.WriteByte(w, '\\')
+			pio.WriteByte(w, byte(r))
 		default:
-			pio.WriteRune(r, w)
+			pio.WriteRune(w, r)
 		}
 	}
 }
